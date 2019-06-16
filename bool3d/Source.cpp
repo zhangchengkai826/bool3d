@@ -3,6 +3,7 @@
 #include <cmath>
 #include <exception>
 #include <random>
+#include <map>
 
 namespace CG {
 	struct Vec3 {
@@ -105,6 +106,8 @@ namespace CG {
 
 		void calcLEN();
 		void calcAABB();
+		Triangle(const Vec3 x[]) :p{ x[0], x[1], x[2] } {}
+		Triangle(const std::initializer_list<Vec3> &x) : Triangle(x.begin()) {}
 		Triangle(const float x[]) :p{ Vec3(x), Vec3(x + 3), Vec3(x + 6) } {}
 		Triangle(const std::initializer_list<float> &x) :Triangle(x.begin()) {}
 	};
@@ -193,9 +196,46 @@ namespace CG {
 		std::mt19937 mt(r());
 		std::uniform_real_distribution<float> ud(-1, 1);
 
-		for (int i = 0; i < 10; i++) {
-			std::cout << ud(mt) << std::endl;
+		/* first triangle */
+		float x[9];
+		for (int i = 0; i < 9; i++) {
+			x[i] = ud(mt);
 		}
+		t.push_back(Triangle(x));
+		t[0].calcLEN();
+		pCnt -= 3;
+
+		while (pCnt > 0) {
+			for (int i = 0; i < 3; i++) {
+				x[i] = ud(mt);
+			}
+			Vec3 v(x);
+
+			std::map<float, int> st;
+			for (int i = 0; i < t.size(); i++) {
+				st[dist(v, t[i])] = i;
+			}
+
+			int idx = st.begin()->second;
+			for (int i = 0; i < 3; i++) {
+				t.push_back(Triangle({ v, t[idx].p[i], t[idx].p[(i + 1) % 3] }));
+				t[t.size() - 1].calcLEN();
+			}
+			t.erase(t.cbegin() + idx);
+
+			pCnt--;
+		}
+	}
+
+	std::ostream& operator<<(std::ostream& os, const Mesh& x) {
+		os << "Mesh( ";
+		for (unsigned i = 0; i < x.t.size(); i++) {
+			os << x.t[i];
+			if (i != x.t.size() - 1)
+				os << ", ";
+		}
+		os << " )";
+		return os;
 	}
 }
 
@@ -205,5 +245,6 @@ int main() {
 	t.calcAABB();
 	std::cout << t << std::endl;
 	std::cout << dist(CG::Vec3({ -2, 7, 1 }), t);
-	CG::Mesh m(4);
+	CG::Mesh m(10);
+	std::cout << m;
 }
