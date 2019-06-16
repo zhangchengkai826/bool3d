@@ -1,6 +1,8 @@
 #include <iostream>
 #include <vector>
 #include <cmath>
+#include <exception>
+#include <random>
 
 namespace CG {
 	struct Vec3 {
@@ -148,6 +150,8 @@ namespace CG {
 
 	struct Mesh {
 		std::vector<Triangle> t;
+
+		Mesh(int pCnt);
 	};
 
 	float dist(Vec3 p, Triangle t) {
@@ -179,6 +183,20 @@ namespace CG {
 
 		return std::abs(h);
 	}
+
+	Mesh::Mesh(int pCnt) {
+		if (pCnt < 4) {
+			std::runtime_error("only >= 4 points can form a water tight volume!");
+		}
+		
+		std::random_device r;
+		std::mt19937 mt(r());
+		std::uniform_real_distribution<float> ud(-1, 1);
+
+		for (int i = 0; i < 10; i++) {
+			std::cout << ud(mt) << std::endl;
+		}
+	}
 }
 
 int main() {
@@ -186,5 +204,6 @@ int main() {
 	t.calcLEN();
 	t.calcAABB();
 	std::cout << t << std::endl;
-	std::cout << dist(CG::Vec3({ -2, 4, 3 }), t);
+	std::cout << dist(CG::Vec3({ -2, 7, 1 }), t);
+	CG::Mesh m(4);
 }
