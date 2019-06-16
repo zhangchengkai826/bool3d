@@ -7,8 +7,16 @@ namespace CG {
 		float e[3];
 		Vec3() {}
 		Vec3(const float x[]);
+		Vec3(const std::initializer_list<float> &x) :Vec3(x.begin()) {}
 		float len();
+		void norm();
+		Vec3 operator/=(float x);
+		Vec3 operator-();
 	};
+
+	float dot(Vec3 a, Vec3 b);
+	Vec3 operator*(Vec3 a, float x);
+	Vec3 operator/(Vec3 a, float x);
 
 	Vec3::Vec3(const float x[]) {
 		for (int i = 0; i < 3; i++) {
@@ -16,12 +24,22 @@ namespace CG {
 		}
 	}
 
+	Vec3 Vec3::operator-() {
+		return *this * (-1);
+	}
+
 	float Vec3::len() {
-		float s = 0;
-		for (int i = 0; i < 3; i++) {
-			s += e[i] * e[i];
-		}
+		float s = dot(*this, *this);
 		return std::sqrt(s);
+	}
+
+	void Vec3::norm() {
+		*this /= len();
+	}
+
+	Vec3 Vec3::operator/=(float x) {
+		*this = *this / x;
+		return *this;
 	}
 
 	Vec3 operator-(Vec3 a, Vec3 b) {
@@ -32,13 +50,32 @@ namespace CG {
 		return v;
 	}
 
-	Vec3 operator/(Vec3 a, float x) {
+	Vec3 norm(Vec3 x) {
+		Vec3 r(x);
+		r.norm();
+		return r;
+	}
+
+	float dot(Vec3 a, Vec3 b) {
+		float s = 0;
+		for(int i = 0; i < 3; i++) {
+			s += a.e[i] * b.e[i];
+		}
+		return s;
+	}
+
+	Vec3 operator*(Vec3 a, float x) {
 		Vec3 v;
 		for (int i = 0; i < 3; i++) {
-			v.e[i] = a.e[i] / x;
+			v.e[i] = a.e[i] * x;
 		}
 		return v;
 	}
+
+	Vec3 operator/(Vec3 a, float x) {
+		return a * (1 / x);
+	}
+
 
 	std::ostream& operator<<(std::ostream& os, const Vec3& x)
 	{
@@ -59,17 +96,19 @@ namespace CG {
 
 	struct Triangle {
 		Vec3 p[3];
-		Vec3 s, t; 
+		float l[3]; /* edge length */
+		Vec3 e[3]; /* edge normalized vector (0->1, 1->2, 2->0) */
+		Vec3 n;
 		AABB aabb;
 
-		void calcST();
+		void calcLEN();
 		void calcAABB();
 		Triangle(const float x[]) :p{ Vec3(x), Vec3(x + 3), Vec3(x + 6) } {}
 		Triangle(const std::initializer_list<float> &x) :Triangle(x.begin()) {}
 	};
 
 	std::ostream& operator<<(std::ostream& os, const Triangle& x) {
-		os << "Triangle( " << "s: " << x.s << ", " << "t: " << x.t << " )";
+		os << "Triangle( " << "n: " << x.n << " )";
 		return os;
 	}
 
@@ -89,20 +128,63 @@ namespace CG {
 		}
 	}
 
-	void Triangle::calcST() {
-		Vec3 s_un = p[1] - p[0], t_un = p[2] - p[0];
-		s = s_un / s_un.len(); 
-		t = t_un / t_un.len();
+	Vec3 cross(Vec3 a, Vec3 b) {
+		Vec3 r;
+		for (int i = 0; i < 3; i++) {
+			int p1 = (i + 1) % 3, p2 = (i + 2) % 3;
+			r.e[i] = a.e[p1] * b.e[p2] - a.e[p2] * b.e[p1];
+		}
+		return r;
+	}
+
+	void Triangle::calcLEN() {
+		for (int i = 0; i < 3; i++) {
+			Vec3 un = p[(i + 1) % 3] - p[i]; 
+			l[i] = un.len();
+			e[i] = un / l[i];
+		}
+		n = norm(cross(e[0], -e[2]));
 	}
 
 	struct Mesh {
 		std::vector<Triangle> t;
 	};
+
+	float dist(Vec3 p, Triangle t) {
+		Vec3 dp[3], dp_proj[3];
+		float length[3];
+		float h = dot(p - t.p[0], t.n);
+		Vec3 hv = t.n * h;
+
+		for (int i = 0; i < 3; i++) {
+			dp[i] = p - t.p[i];
+			dp_proj[i] = dp[i] - hv;
+			length[i] = dot(dp_proj[i], t.e[i]);
+		}
+
+		for (int i = 0; i < 3; i++) {
+			Vec3 dv = cross(dp_proj[i], t.e[i]);
+			float val = dot(t.n, dv);
+			if (length[i] >= 0 && length[i] <= t.l[i] && val > 0) {
+				return dv.len();
+			}
+		}
+
+		for (int i = 0; i < 3; i++) {
+			int m = (i + 2) % 3;
+			if (length[i] < 0 && length[m] > t.l[m]) {
+				return dp[i].len();
+			}
+		}
+
+		return std::abs(h);
+	}
 }
 
 int main() {
 	CG::Triangle t({ -2, 4, 3, 1, -5, 9, 2, 3, 8 });
-	t.calcST();
+	t.calcLEN();
 	t.calcAABB();
-	std::cout << t;
+	std::cout << t << std::endl;
+	std::cout << dist(CG::Vec3({ -2, 4, 3 }), t);
 }
